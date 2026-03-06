@@ -194,3 +194,27 @@ export interface UserSettings {
   voyage_api_key: string | null
   model: string
 }
+
+export type MemberRole = 'viewer' | 'editor'
+
+export interface ProjectMember {
+  id: string
+  project_id: string
+  user_id: string
+  role: MemberRole
+  invited_by: string | null
+  created_at: string
+  // joined from auth/profiles:
+  email?: string
+  name?: string | null
+}
+
+export interface ProjectInvitation {
+  id: string
+  project_id: string
+  email: string
+  role: MemberRole
+  invited_by: string
+  status: 'pending' | 'accepted'
+  created_at: string
+}
