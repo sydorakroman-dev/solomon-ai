@@ -8,6 +8,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Users, Sliders } from 'lucide-react'
+import ProjectMembersPanel from '@/components/project/ProjectMembersPanel'
 import type { PromptStage } from '@/types'
 
 const STAGES: { value: PromptStage; label: string; description: string }[] = [
@@ -78,60 +80,87 @@ export default function ProjectSettingsPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold">Project Settings</h1>
         <p className="text-muted-foreground text-sm mt-0.5">
-          Override AI prompts for this project. Leave blank to use the system default.
+          Manage collaborators and AI prompt overrides for this project.
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Prompt Overrides</CardTitle>
-          <CardDescription>
-            These prompts override the system defaults for this project only.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="charter">
-            <TabsList className="w-full mb-4">
-              {STAGES.map(s => (
-                <TabsTrigger key={s.value} value={s.value} className="flex-1 text-xs">{s.label}</TabsTrigger>
-              ))}
-            </TabsList>
-            {STAGES.map(stage => (
-              <TabsContent key={stage.value} value={stage.value} className="space-y-3">
-                <p className="text-sm text-muted-foreground">{stage.description}</p>
+      <Tabs defaultValue="members">
+        <TabsList className="mb-6">
+          <TabsTrigger value="members" className="gap-1.5">
+            <Users className="h-3.5 w-3.5" />Members
+          </TabsTrigger>
+          <TabsTrigger value="prompts" className="gap-1.5">
+            <Sliders className="h-3.5 w-3.5" />Prompts
+          </TabsTrigger>
+        </TabsList>
 
-                {systemDefaults[stage.value] && (
-                  <div className="rounded-lg bg-muted/40 p-3">
-                    <p className="text-xs font-medium text-muted-foreground mb-1">System default:</p>
-                    <p className="text-xs text-muted-foreground">{systemDefaults[stage.value]}</p>
-                  </div>
-                )}
+        <TabsContent value="members">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Team Members</CardTitle>
+              <CardDescription>
+                Invite collaborators to view or edit this project. Editors have full access; viewers can only read.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ProjectMembersPanel />
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-                <div className="space-y-1.5">
-                  <Label>Project override</Label>
-                  <Textarea
-                    placeholder={`Leave blank to use system default. Override for this project...`}
-                    value={prompts[stage.value]}
-                    onChange={e => setPrompts(prev => ({ ...prev, [stage.value]: e.target.value }))}
-                    rows={6}
-                  />
-                </div>
+        <TabsContent value="prompts">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Prompt Overrides</CardTitle>
+              <CardDescription>
+                These prompts override the system defaults for this project only.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="charter">
+                <TabsList className="w-full mb-4">
+                  {STAGES.map(s => (
+                    <TabsTrigger key={s.value} value={s.value} className="flex-1 text-xs">{s.label}</TabsTrigger>
+                  ))}
+                </TabsList>
+                {STAGES.map(stage => (
+                  <TabsContent key={stage.value} value={stage.value} className="space-y-3">
+                    <p className="text-sm text-muted-foreground">{stage.description}</p>
 
-                <div className="flex gap-2">
-                  <Button size="sm" onClick={() => handleSave(stage.value)} disabled={saving === stage.value}>
-                    {saving === stage.value ? 'Saving...' : 'Save override'}
-                  </Button>
-                  {prompts[stage.value] && (
-                    <Button size="sm" variant="ghost" onClick={() => handleReset(stage.value)}>
-                      Reset to default
-                    </Button>
-                  )}
-                </div>
-              </TabsContent>
-            ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+                    {systemDefaults[stage.value] && (
+                      <div className="rounded-lg bg-muted/40 p-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">System default:</p>
+                        <p className="text-xs text-muted-foreground">{systemDefaults[stage.value]}</p>
+                      </div>
+                    )}
+
+                    <div className="space-y-1.5">
+                      <Label>Project override</Label>
+                      <Textarea
+                        placeholder="Leave blank to use system default. Override for this project..."
+                        value={prompts[stage.value]}
+                        onChange={e => setPrompts(prev => ({ ...prev, [stage.value]: e.target.value }))}
+                        rows={6}
+                      />
+                    </div>
+
+                    <div className="flex gap-2">
+                      <Button size="sm" onClick={() => handleSave(stage.value)} disabled={saving === stage.value}>
+                        {saving === stage.value ? 'Saving...' : 'Save override'}
+                      </Button>
+                      {prompts[stage.value] && (
+                        <Button size="sm" variant="ghost" onClick={() => handleReset(stage.value)}>
+                          Reset to default
+                        </Button>
+                      )}
+                    </div>
+                  </TabsContent>
+                ))}
+              </Tabs>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
