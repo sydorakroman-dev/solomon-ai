@@ -31,6 +31,10 @@ export async function POST(request: Request, { params }: Params) {
   const existing = allUsers.find((u: { email?: string }) => u.email?.toLowerCase() === normalizedEmail)
 
   if (existing) {
+    // Prevent owner from inviting themselves
+    if (existing.id === user.id) {
+      return NextResponse.json({ error: 'You cannot invite yourself' }, { status: 400 })
+    }
     // User exists — add directly to project_members
     const { error } = await adminClient.from('project_members').upsert(
       { project_id: id, user_id: existing.id, role, invited_by: user.id },

@@ -134,14 +134,16 @@ export default function ProjectMembersPanel() {
       <div>
         <h3 className="text-sm font-medium mb-2">Members</h3>
         <div className="space-y-1.5">
-          {/* Owner row — always first */}
-          <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-              <span className="text-sm font-medium truncate">You (owner)</span>
+          {/* Owner row — only shown to the owner themselves */}
+          {isOwner && (
+            <div className="flex items-center justify-between rounded-lg border px-3 py-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <Crown className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="text-sm font-medium truncate">You (owner)</span>
+              </div>
+              <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">Owner</Badge>
             </div>
-            <Badge variant="outline" className="text-xs bg-amber-50 text-amber-700 border-amber-200">Owner</Badge>
-          </div>
+          )}
 
           {members.map(member => (
             <div key={member.id} className="flex items-center justify-between rounded-lg border px-3 py-2.5">
