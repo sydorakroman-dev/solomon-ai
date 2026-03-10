@@ -51,7 +51,7 @@ export async function POST(request: Request, { params }: Params) {
   )
   if (inviteError) return NextResponse.json({ error: inviteError.message }, { status: 500 })
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://solomon.quitcode.com'
   await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
     redirectTo: `${appUrl}/dashboard`,
   })
