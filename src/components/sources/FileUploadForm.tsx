@@ -11,10 +11,10 @@ import type { DataSource, SourceType } from '@/types'
 
 const FILE_TYPES: { value: SourceType; label: string; accept: string }[] = [
   { value: 'pdf', label: 'PDF document', accept: '.pdf' },
-  { value: 'call_transcript', label: 'Call transcript (.txt, .pdf)', accept: '.txt,.pdf' },
   { value: 'json_schema', label: 'DB Schema (.json)', accept: '.json' },
   { value: 'job_description_initial', label: 'Initial job brief (.pdf, .txt)', accept: '.pdf,.txt' },
   { value: 'job_description_detailed', label: 'Detailed job description (.pdf, .txt, .doc)', accept: '.pdf,.txt,.doc,.docx' },
+  { value: 'spreadsheet', label: 'Spreadsheet (.csv, .xlsx)', accept: '.csv,.xlsx,.xls' },
 ]
 
 interface Props {
