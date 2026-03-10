@@ -10,7 +10,12 @@ vi.mock('pdf-parse', () => {
   return { default: fn, ...fn }
 })
 
-import { extractJsonSchema, truncateContent } from '@/lib/utils/files'
+vi.mock('mammoth', () => ({
+  extractRawText: vi.fn().mockResolvedValue({ value: '  Call transcript text.  ' }),
+}))
+
+import { extractJsonSchema, truncateContent, extractDocxText } from '@/lib/utils/files'
+import * as mammoth from 'mammoth'
 
 describe('extractJsonSchema', () => {
   it('pretty-prints valid JSON', () => {
@@ -93,3 +98,16 @@ describe('truncateContent', () => {
 // extractPdfText is a thin wrapper: `const data = await pdfParse(buffer); return data.text.trim()`
 // Testing its integration requires a real PDF fixture and a Node-compatible build of pdf-parse.
 // The meaningful testable surface (extractJsonSchema, truncateContent) is fully covered above.
+
+describe('extractDocxText', () => {
+  it('extracts and trims text from a DOCX buffer', async () => {
+    const result = await extractDocxText(Buffer.from('fake-docx'))
+    expect(result).toBe('Call transcript text.')
+  })
+
+  it('returns empty string when DOCX has no text', async () => {
+    vi.mocked(mammoth.extractRawText).mockResolvedValueOnce({ value: '   ' })
+    const result = await extractDocxText(Buffer.from('empty-docx'))
+    expect(result).toBe('')
+  })
+})

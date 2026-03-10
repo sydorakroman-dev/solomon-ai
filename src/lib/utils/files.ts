@@ -6,6 +6,13 @@ export async function extractPdfText(buffer: Buffer): Promise<string> {
   return (data.text as string).trim()
 }
 
+import * as mammoth from 'mammoth'
+
+export async function extractDocxText(buffer: Buffer): Promise<string> {
+  const result = await mammoth.extractRawText({ buffer })
+  return (result.value as string).trim()
+}
+
 export function extractJsonSchema(text: string): string {
   try {
     const parsed = JSON.parse(text)
