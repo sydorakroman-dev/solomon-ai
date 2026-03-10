@@ -34,6 +34,7 @@ export type SourceType =
   | 'job_description_detailed'
   | 'call_transcript'
   | 'domain_knowledge'
+  | 'spreadsheet'
 
 export type SourceStatus = 'processing' | 'ready' | 'error'
 

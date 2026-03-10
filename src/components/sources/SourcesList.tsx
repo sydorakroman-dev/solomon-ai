@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { Trash2, FileText, Globe, Database, MessageSquare, Briefcase, Brain, ClipboardList, Eye, Sparkles } from 'lucide-react'
+import { Trash2, FileText, Globe, Database, MessageSquare, Briefcase, Brain, ClipboardList, Eye, Sparkles, Table2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -21,6 +21,7 @@ const SOURCE_CONFIG: Record<SourceType, { label: string; icon: React.ElementType
   job_description_detailed:{ label: 'Job Description', icon: Briefcase,     color: 'bg-orange-50 text-orange-600' },
   call_transcript:         { label: 'Call Transcript', icon: MessageSquare, color: 'bg-indigo-50 text-indigo-600' },
   domain_knowledge:        { label: 'Domain Research', icon: Brain,         color: 'bg-teal-50 text-teal-600' },
+  spreadsheet:             { label: 'Spreadsheet',     icon: Table2,        color: 'bg-emerald-50 text-emerald-600' },
 }
 
 interface SourcesListProps {
