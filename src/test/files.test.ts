@@ -106,7 +106,7 @@ describe('extractDocxText', () => {
   })
 
   it('returns empty string when DOCX has no text', async () => {
-    vi.mocked(mammoth.extractRawText).mockResolvedValueOnce({ value: '   ' })
+    vi.mocked(mammoth.extractRawText).mockResolvedValueOnce({ value: '   ', messages: [] })
     const result = await extractDocxText(Buffer.from('empty-docx'))
     expect(result).toBe('')
   })
