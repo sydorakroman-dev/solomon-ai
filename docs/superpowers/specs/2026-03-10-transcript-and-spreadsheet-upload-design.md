@@ -78,7 +78,7 @@ SheetJS (`xlsx` package) reads all sheets. Each sheet is converted to a markdown
 ...
 ```
 
-**Large file handling:** If total extracted content exceeds 50,000 characters, sheets are prioritized by row count (largest first). Truncation occurs at sheet boundaries with a note: `[N additional sheets truncated — upload separately for full coverage]`.
+**Large file handling:** Sheets are processed in document order. Once the accumulated content exceeds 50,000 characters, remaining sheets are skipped and a note is appended: `[N additional sheets truncated — upload separately for full coverage]`. The first sheet always fits regardless of size.
 
 **Empty row/column handling:** Trailing empty rows and fully-empty columns are stripped before conversion.
 
