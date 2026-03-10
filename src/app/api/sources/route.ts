@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { extractPdfText, extractJsonSchema, truncateContent } from '@/lib/utils/files'
+import { extractPdfText, extractDocxText, extractJsonSchema, extractSpreadsheet, truncateContent } from '@/lib/utils/files'
 import { scrapeWebsite } from '@/lib/utils/scraper'
 import { generateEmbedding } from '@/lib/utils/embeddings'
 
@@ -122,9 +122,20 @@ async function handleFileUpload(
     if (file.name.endsWith('.pdf')) {
       content = truncateContent(await extractPdfText(buffer))
       metadata.file_type = 'pdf'
+    } else if (file.name.endsWith('.docx')) {
+      content = truncateContent(await extractDocxText(buffer))
+      metadata.file_type = 'docx'
     } else if (file.name.endsWith('.json')) {
       content = extractJsonSchema(buffer.toString('utf-8'))
       metadata.file_type = 'json'
+    } else if (
+      file.name.endsWith('.csv') ||
+      file.name.endsWith('.xlsx') ||
+      file.name.endsWith('.xls')
+    ) {
+      content = extractSpreadsheet(buffer)
+      metadata.file_type = file.name.endsWith('.csv') ? 'csv' : 'xlsx'
+      metadata.sheet_count = (content.match(/^# Sheet:/gm) ?? []).length
     } else {
       // Plain text / transcript
       content = truncateContent(buffer.toString('utf-8'))
