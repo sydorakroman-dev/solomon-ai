@@ -14,8 +14,22 @@ vi.mock('mammoth', () => ({
   extractRawText: vi.fn().mockResolvedValue({ value: '  Call transcript text.  ' }),
 }))
 
-import { extractJsonSchema, truncateContent, extractDocxText } from '@/lib/utils/files'
+vi.mock('xlsx', () => ({
+  read: vi.fn().mockReturnValue({
+    SheetNames: ['Sales Data'],
+    Sheets: { 'Sales Data': {} },
+  }),
+  utils: {
+    sheet_to_json: vi.fn().mockReturnValue([
+      { Month: 'Jan', Revenue: '42000', Deals: '12' },
+      { Month: 'Feb', Revenue: '38000', Deals: '9' },
+    ]),
+  },
+}))
+
+import { extractJsonSchema, truncateContent, extractDocxText, extractSpreadsheet } from '@/lib/utils/files'
 import * as mammoth from 'mammoth'
+import * as XLSX from 'xlsx'
 
 describe('extractJsonSchema', () => {
   it('pretty-prints valid JSON', () => {
@@ -109,5 +123,55 @@ describe('extractDocxText', () => {
     vi.mocked(mammoth.extractRawText).mockResolvedValueOnce({ value: '   ', messages: [] })
     const result = await extractDocxText(Buffer.from('empty-docx'))
     expect(result).toBe('')
+  })
+})
+
+describe('extractSpreadsheet', () => {
+  it('formats a single sheet as a markdown table', () => {
+    const result = extractSpreadsheet(Buffer.from('fake-xlsx'))
+    expect(result).toContain('# Sheet: Sales Data')
+    expect(result).toContain('| Month | Revenue | Deals |')
+    expect(result).toContain('| Jan | 42000 | 12 |')
+    expect(result).toContain('| Feb | 38000 | 9 |')
+  })
+
+  it('includes separator row in markdown table', () => {
+    const result = extractSpreadsheet(Buffer.from('fake-xlsx'))
+    expect(result).toContain('| --- |')
+  })
+
+  it('throws when all sheets are empty', () => {
+    vi.mocked(XLSX.utils.sheet_to_json).mockReturnValueOnce([])
+    expect(() => extractSpreadsheet(Buffer.from('empty'))).toThrow('Spreadsheet appears to be empty')
+  })
+
+  it('handles multiple sheets', () => {
+    vi.mocked(XLSX.read).mockReturnValueOnce({
+      SheetNames: ['Sheet1', 'Sheet2'],
+      Sheets: { Sheet1: {}, Sheet2: {} },
+    } as unknown as XLSX.WorkBook)
+    vi.mocked(XLSX.utils.sheet_to_json)
+      .mockReturnValueOnce([{ A: '1' }])
+      .mockReturnValueOnce([{ B: '2' }])
+    const result = extractSpreadsheet(Buffer.from('multi'))
+    expect(result).toContain('# Sheet: Sheet1')
+    expect(result).toContain('# Sheet: Sheet2')
+  })
+
+  it('notes truncated sheets when content exceeds 50000 chars', () => {
+    vi.mocked(XLSX.read).mockReturnValueOnce({
+      SheetNames: ['Big', 'Small'],
+      Sheets: { Big: {}, Small: {} },
+    } as unknown as XLSX.WorkBook)
+    const bigRows = Array.from({ length: 1000 }, () => ({
+      Col1: 'x'.repeat(50),
+      Col2: 'y'.repeat(50),
+    }))
+    vi.mocked(XLSX.utils.sheet_to_json)
+      .mockReturnValueOnce(bigRows)
+      .mockReturnValueOnce([{ Z: 'skipped' }])
+    const result = extractSpreadsheet(Buffer.from('big'))
+    expect(result).toContain('additional sheet')
+    expect(result).toContain('truncated')
   })
 })
