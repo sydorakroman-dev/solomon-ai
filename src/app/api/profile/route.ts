@@ -23,8 +23,13 @@ export async function PATCH(request: Request) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await request.json()
-  const { full_name, email, password, current_password } = body
+  let body: Record<string, unknown>
+  try {
+    body = await request.json()
+  } catch {
+    return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const { full_name, email, password, current_password } = body as { full_name?: string; email?: string; password?: string; current_password?: string }
 
   // Update full name
   if (full_name !== undefined) {
@@ -45,6 +50,9 @@ export async function PATCH(request: Request) {
 
   // Update password
   if (password) {
+    if (password.length < 8) {
+      return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+    }
     if (!current_password) {
       return NextResponse.json({ error: 'Current password is required' }, { status: 400 })
     }
