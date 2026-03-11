@@ -36,10 +36,9 @@ export async function PATCH(request: Request) {
     if (!email && !password) return NextResponse.json({ message: 'Name updated' })
   }
 
-  // Update email (admin client bypasses session constraints for server-side update)
+  // Update email (use session-based auth to trigger confirmation flow)
   if (email) {
-    const admin = await createAdminClient()
-    const { error } = await admin.auth.admin.updateUserById(user.id, { email })
+    const { error } = await supabase.auth.updateUser({ email })
     if (error) return NextResponse.json({ error: error.message }, { status: 400 })
     return NextResponse.json({ message: 'Check your inbox to confirm the new email address.' })
   }
