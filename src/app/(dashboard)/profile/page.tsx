@@ -13,11 +13,13 @@ function KeyInput({
   value,
   placeholder,
   onChange,
+  disabled,
 }: {
   id: string
   value: string
   placeholder: string
   onChange: (v: string) => void
+  disabled?: boolean
 }) {
   const [show, setShow] = useState(false)
   return (
@@ -29,11 +31,13 @@ function KeyInput({
         value={value}
         onChange={e => onChange(e.target.value)}
         className="pr-10"
+        disabled={disabled}
       />
       <button
         type="button"
         onClick={() => setShow(v => !v)}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+        disabled={disabled}
       >
         {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
       </button>
@@ -49,15 +53,17 @@ export default function ProfilePage() {
   const [savingEmail, setSavingEmail] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [savingPassword, setSavingPassword] = useState(false)
+  const [loadingProfile, setLoadingProfile] = useState(true)
 
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.email) setCurrentEmail(data.email)
-        if (data?.full_name) setProfileName(data.full_name ?? '')
+        if (data?.full_name) setProfileName(data.full_name)
       })
       .catch(() => null)
+      .finally(() => setLoadingProfile(false))
   }, [])
 
   async function handleSaveName(e: React.FormEvent) {
@@ -69,7 +75,8 @@ export default function ProfilePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ full_name: profileName }),
       })
-      if (!res.ok) throw new Error((await res.json()).error)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
       toast.success('Name updated')
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update name')
@@ -145,9 +152,10 @@ export default function ProfilePage() {
                   placeholder="Your name"
                   value={profileName}
                   onChange={e => setProfileName(e.target.value)}
+                  disabled={loadingProfile}
                 />
               </div>
-              <Button type="submit" size="sm" disabled={savingName}>
+              <Button type="submit" size="sm" disabled={savingName || loadingProfile}>
                 {savingName ? 'Saving...' : 'Save name'}
               </Button>
             </form>
@@ -172,9 +180,10 @@ export default function ProfilePage() {
                   placeholder="new@example.com"
                   value={newEmail}
                   onChange={e => setNewEmail(e.target.value)}
+                  disabled={loadingProfile}
                 />
               </div>
-              <Button type="submit" size="sm" disabled={savingEmail || !newEmail}>
+              <Button type="submit" size="sm" disabled={savingEmail || !newEmail || loadingProfile}>
                 {savingEmail ? 'Sending...' : 'Send confirmation email'}
               </Button>
               <p className="text-xs text-muted-foreground">
@@ -198,6 +207,7 @@ export default function ProfilePage() {
                   placeholder="Current password"
                   value={passwordForm.current}
                   onChange={v => setPasswordForm(f => ({ ...f, current: v }))}
+                  disabled={loadingProfile}
                 />
               </div>
               <div className="space-y-1.5">
@@ -207,6 +217,7 @@ export default function ProfilePage() {
                   placeholder="New password"
                   value={passwordForm.next}
                   onChange={v => setPasswordForm(f => ({ ...f, next: v }))}
+                  disabled={loadingProfile}
                 />
               </div>
               <div className="space-y-1.5">
@@ -216,12 +227,13 @@ export default function ProfilePage() {
                   placeholder="Confirm new password"
                   value={passwordForm.confirm}
                   onChange={v => setPasswordForm(f => ({ ...f, confirm: v }))}
+                  disabled={loadingProfile}
                 />
               </div>
               <Button
                 type="submit"
                 size="sm"
-                disabled={savingPassword || !passwordForm.current || !passwordForm.next || !passwordForm.confirm}
+                disabled={savingPassword || !passwordForm.current || !passwordForm.next || !passwordForm.confirm || loadingProfile}
               >
                 {savingPassword ? 'Updating...' : 'Update password'}
               </Button>
