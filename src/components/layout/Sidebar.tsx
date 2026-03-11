@@ -7,7 +7,8 @@ import {
   LayoutDashboard,
   FolderOpen,
   Settings,
-  Shield,
+  User,
+  Users,
   LogOut,
   FileText,
   Database,
@@ -29,11 +30,15 @@ interface NavItem {
 
 const dashboardNav: NavItem[] = [
   { label: 'Projects', href: '/dashboard', icon: LayoutDashboard },
-  { label: 'System Settings', href: '/settings', icon: Settings },
 ]
 
-const adminNav: NavItem[] = [
-  { label: 'Admin', href: '/admin', icon: Shield },
+const settingsNavAll: NavItem[] = [
+  { label: 'Profile', href: '/profile', icon: User },
+]
+
+const settingsNavAdmin: NavItem[] = [
+  { label: 'System Settings', href: '/settings', icon: Settings },
+  { label: 'User Management', href: '/user-management', icon: Users },
 ]
 
 function projectNav(id: string): NavItem[] {
@@ -149,27 +154,29 @@ export default function Sidebar({ role }: SidebarProps) {
           </Link>
         ))}
 
-        {!projectId && role === 'admin' && (
-          <>
-            <div className="my-2 border-t border-sidebar-border" />
-            {adminNav.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={cn(
-                  'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
-                  isActive(item.href)
-                    ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
-                )}
-              >
-                <item.icon className="h-4 w-4 shrink-0" />
-                {item.label}
-              </Link>
-            ))}
-          </>
-        )}
       </nav>
+
+      {/* Settings group — always visible */}
+      <div className="border-t border-sidebar-border px-2 py-2 space-y-0.5">
+        <p className="px-2.5 py-1 text-xs font-medium text-sidebar-foreground/40 uppercase tracking-wider">
+          Settings
+        </p>
+        {[...settingsNavAll, ...(role === 'admin' ? settingsNavAdmin : [])].map(item => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              'flex items-center gap-2.5 rounded-md px-2.5 py-2 text-sm transition-colors',
+              isActive(item.href)
+                ? 'bg-sidebar-accent text-sidebar-accent-foreground font-medium'
+                : 'text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground'
+            )}
+          >
+            <item.icon className="h-4 w-4 shrink-0" />
+            {item.label}
+          </Link>
+        ))}
+      </div>
 
       {/* Logout */}
       <div className="border-t border-sidebar-border p-2">
