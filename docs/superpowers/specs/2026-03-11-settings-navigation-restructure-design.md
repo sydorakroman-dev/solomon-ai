@@ -58,7 +58,7 @@ A new "Settings" group is pinned at the bottom of the sidebar, rendered in all c
 - Add server-side admin guard: redirect to `/profile` if not admin
 
 **`/user-management` (renamed from `/admin`):**
-- Existing admin page content unchanged
+- Existing admin page content, with one removal: the "System Prompts" tab is deleted from this page (System Prompts now live exclusively in `/settings`)
 - Add server-side admin guard (same pattern as `/admin` already has)
 
 ---
@@ -68,8 +68,11 @@ A new "Settings" group is pinned at the bottom of the sidebar, rendered in all c
 The dashboard `layout.tsx` already fetches `profiles.role` and passes it to Sidebar as a prop. No new data fetching is needed.
 
 - **Sidebar:** renders Settings group items conditionally based on `role` prop (already available).
-- **Page-level guard:** `/settings/page.tsx` and `/user-management/page.tsx` check role and `redirect('/profile')` if not admin. Use the same server-side Supabase client pattern already used in `layout.tsx`.
-- **`/admin` redirect:** add a `src/app/(dashboard)/admin/page.tsx` that redirects to `/user-management` to preserve old bookmarks.
+- **Page-level guard for `/settings`:** The current `settings/page.tsx` is a `'use client'` component with a client-side admin probe. Convert it to a **Server Component** (remove `'use client'`, move data fetching server-side) so a server-side `redirect('/profile')` can fire before the page renders for non-admins. The existing client-side `isAdmin` probe against `/api/admin/users` becomes redundant once the server guard is in place and should be removed — System Prompts editing is always available since only admins can reach the page. API calls (`/api/settings`, `/api/system-prompts`, `/api/models`) continue to work as before; initial data can be server-fetched and passed as props to a `'use client'` child component if needed for interactivity.
+- **Page-level guard for `/user-management`:** Already a Server Component — add the same role check and `redirect('/profile')` at the top, matching the pattern in `layout.tsx`.
+- **`/admin` redirect:** Replace the existing `admin/page.tsx` content with a simple Server Component that calls `redirect('/user-management')`.
+- **`/profile`:** No guard needed. Authentication is already handled by the dashboard layout. Implement as a pure `'use client'` component (same pattern as the current Profile tab), fetching `/api/profile` on mount via `useEffect`.
+
 
 ---
 
@@ -80,7 +83,7 @@ The dashboard `layout.tsx` already fetches `profiles.role` and passes it to Side
 | New | `src/app/(dashboard)/profile/page.tsx` | Profile Settings page (name, email, password) |
 | Modify | `src/app/(dashboard)/settings/page.tsx` | System Settings — remove Profile tab, add admin guard |
 | New | `src/app/(dashboard)/user-management/page.tsx` | User Management — copy of current admin page |
-| New | `src/app/(dashboard)/admin/page.tsx` | Redirect `/admin` → `/user-management` |
+| Modify (replace content) | `src/app/(dashboard)/admin/page.tsx` | Redirect `/admin` → `/user-management` (replace existing 300-line component with a single `redirect()` call) |
 | Modify | `src/components/layout/Sidebar.tsx` | Add persistent Settings group at bottom |
 | Modify | `src/app/(dashboard)/layout.tsx` | Remove old "System Settings" top-level nav link |
 
