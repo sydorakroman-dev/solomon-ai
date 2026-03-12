@@ -53,7 +53,7 @@ export async function POST(request: Request, { params }: Params) {
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://solomon.quitcode.com'
   await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
-    redirectTo: `${appUrl}/dashboard`,
+    redirectTo: `${appUrl}/auth/callback?next=/dashboard`,
   })
 
   return NextResponse.json({ status: 'invited', email: normalizedEmail })
