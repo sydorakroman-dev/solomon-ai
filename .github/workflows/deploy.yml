@@ -1,0 +1,59 @@
+name: Deploy Solomon
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: solomon-production-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_HOST: 91.98.68.42
+      DEPLOY_USER: root
+      DEPLOY_KEY: ${{ secrets.SOLOMON_DEPLOY_KEY }}
+      DEPLOY_PATH: /root/app/solomon
+      DEPLOY_PORT: 22
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate deployment secret
+        run: |
+          if [ -z "${DEPLOY_KEY}" ]; then
+            echo "::error::Missing required secret: SOLOMON_DEPLOY_KEY"
+            exit 1
+          fi
+
+      - name: Configure SSH
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${DEPLOY_KEY}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
+
+      - name: Sync project files to server
+        run: |
+          rsync -az --delete \
+            --exclude '.env' \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '.next' \
+            --exclude 'node_modules' \
+            -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT:-22}" \
+            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
+
+      - name: Rebuild and restart Solomon
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
+          set -e
+          cd "${DEPLOY_PATH}"
+          docker compose up -d --build --remove-orphans
+          EOF
