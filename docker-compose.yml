@@ -1,0 +1,32 @@
+services:
+  solomon:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+        SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    container_name: solomon
+    restart: unless-stopped
+    env_file:
+      - ./.env
+    environment:
+      NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
+    networks:
+      - proxy
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.solomon-http.rule=Host(`solomon.quitcode.com`)"
+      - "traefik.http.routers.solomon-http.entrypoints=web"
+      - "traefik.http.routers.solomon-http.middlewares=solomon-redirect"
+      - "traefik.http.routers.solomon.rule=Host(`solomon.quitcode.com`)"
+      - "traefik.http.routers.solomon.entrypoints=websecure"
+      - "traefik.http.routers.solomon.tls.certresolver=le"
+      - "traefik.http.services.solomon.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.solomon-redirect.redirectscheme.scheme=https"
+
+networks:
+  proxy:
+    external: true
