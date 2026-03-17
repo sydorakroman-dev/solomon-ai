@@ -14,12 +14,11 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
-  const [mode, setMode] = useState<'signin' | 'signup'>('signin')
+  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setLoading(true)
-
     const supabase = createClient()
 
     try {
@@ -28,10 +27,23 @@ export default function LoginPage() {
         if (error) throw error
         router.push('/dashboard')
         router.refresh()
-      } else {
-        const { error } = await supabase.auth.signUp({ email, password })
+
+      } else if (mode === 'signup') {
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        })
         if (error) throw error
         toast.success('Account created! Check your email to confirm.')
+        setMode('signin')
+
+      } else {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
+        })
+        if (error) throw error
+        toast.success('Password reset email sent. Check your inbox.')
         setMode('signin')
       }
     } catch (err) {
@@ -52,12 +64,14 @@ export default function LoginPage() {
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">
-              {mode === 'signin' ? 'Sign in' : 'Create account'}
+              {mode === 'signin' ? 'Sign in' : mode === 'signup' ? 'Create account' : 'Reset password'}
             </CardTitle>
             <CardDescription>
               {mode === 'signin'
                 ? 'Enter your credentials to access your projects'
-                : 'Set up your Solomon account'}
+                : mode === 'signup'
+                ? 'Set up your Solomon account'
+                : "Enter your email and we'll send a reset link"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -74,33 +88,65 @@ export default function LoginPage() {
                   autoFocus
                 />
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="password">Password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
+
+              {mode !== 'forgot' && (
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+              )}
+
               <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Loading...' : mode === 'signin' ? 'Sign in' : 'Create account'}
+                {loading
+                  ? 'Loading...'
+                  : mode === 'signin'
+                  ? 'Sign in'
+                  : mode === 'signup'
+                  ? 'Create account'
+                  : 'Send reset email'}
               </Button>
             </form>
 
-            <p className="mt-4 text-center text-sm text-muted-foreground">
-              {mode === 'signin' ? "Don't have an account? " : 'Already have an account? '}
-              <button
-                type="button"
-                className="font-medium text-foreground underline-offset-2 hover:underline"
-                onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
-              >
-                {mode === 'signin' ? 'Sign up' : 'Sign in'}
-              </button>
-            </p>
+            <div className="mt-4 flex flex-col items-center gap-1.5 text-sm text-muted-foreground">
+              {mode === 'signin' && (
+                <>
+                  <button
+                    type="button"
+                    className="font-medium text-foreground underline-offset-2 hover:underline"
+                    onClick={() => setMode('forgot')}
+                  >
+                    Forgot password?
+                  </button>
+                  <span>
+                    Don&apos;t have an account?{' '}
+                    <button
+                      type="button"
+                      className="font-medium text-foreground underline-offset-2 hover:underline"
+                      onClick={() => setMode('signup')}
+                    >
+                      Sign up
+                    </button>
+                  </span>
+                </>
+              )}
+              {mode !== 'signin' && (
+                <button
+                  type="button"
+                  className="font-medium text-foreground underline-offset-2 hover:underline"
+                  onClick={() => setMode('signin')}
+                >
+                  Back to sign in
+                </button>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
