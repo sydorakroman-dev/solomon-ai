@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { syncStoryToGitHub } from '@/lib/github-sync'
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
@@ -12,7 +13,8 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     .from('user_stories').update({ ...body, updated_at: new Date().toISOString() }).eq('id', id).select().single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  const syncResult = await syncStoryToGitHub(id, data.project_id as string)
+  return NextResponse.json({ ...data, ...syncResult })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
