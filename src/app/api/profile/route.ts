@@ -8,13 +8,15 @@ export async function GET() {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('full_name')
+    .select('full_name, github_username, github_connected_at')
     .eq('user_id', user.id)
     .single()
 
   return NextResponse.json({
     email: user.email,
     full_name: profile?.full_name ?? null,
+    github_username: profile?.github_username ?? null,
+    github_connected_at: profile?.github_connected_at ?? null,
   })
 }
 
