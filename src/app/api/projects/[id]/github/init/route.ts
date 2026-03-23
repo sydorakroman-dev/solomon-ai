@@ -10,6 +10,7 @@ import {
   createIssue,
   formatStoryBody,
 } from '@/lib/github'
+import { repoNameFromUrl } from '@/lib/github-sync'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -54,7 +55,7 @@ export async function POST(request: Request, { params }: Params) {
     if (project.github_repo_url) {
       // Partial export — reuse existing repo
       repoUrl = project.github_repo_url
-      repoFullName = repoUrl.replace('https://github.com/', '').replace(/\/$/, '')
+      repoFullName = repoNameFromUrl(repoUrl)
     } else {
       // Create new repo
       const repo = await createRepo(token, repoName, isPrivate)
@@ -161,7 +162,7 @@ export async function POST(request: Request, { params }: Params) {
       httpStatus = 500
     }
 
-    await supabase.from('projects').update({ github_sync_error: message }).eq('id', id)
+    await adminClient.from('projects').update({ github_sync_error: message }).eq('id', id)
     return NextResponse.json({ error: message }, { status: httpStatus })
   }
 }

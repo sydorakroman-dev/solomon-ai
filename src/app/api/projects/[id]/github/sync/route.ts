@@ -44,7 +44,7 @@ export async function POST(_req: Request, { params }: Params) {
   if (!token) {
     return NextResponse.json(
       { error: 'GitHub connection lost. Reconnect in your Profile.' },
-      { status: 400 }
+      { status: 403 }
     )
   }
 
