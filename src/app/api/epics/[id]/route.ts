@@ -10,7 +10,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const body = await request.json()
   const { data, error } = await supabase
-    .from('epics').update({ ...body, updated_at: new Date().toISOString() }).eq('id', id).select().single()
+    .from('epics').update({ ...body, updated_at: new Date().toISOString() }).eq('id', id).select('*, project_id').single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const syncResult = await syncEpicToGitHub(id, data.project_id as string)
