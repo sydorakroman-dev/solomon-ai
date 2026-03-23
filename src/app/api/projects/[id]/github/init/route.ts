@@ -39,7 +39,7 @@ export async function POST(request: Request, { params }: Params) {
   if (!token) {
     return NextResponse.json(
       { error: 'GitHub account not connected. Connect GitHub in your Profile first.' },
-      { status: 400 }
+      { status: 403 }
     )
   }
 
@@ -135,9 +135,33 @@ export async function POST(request: Request, { params }: Params) {
 
     return NextResponse.json({ repoUrl })
   } catch (err) {
-    const message = err instanceof GitHubError ? err.message : 'Failed to export to GitHub'
+    let message: string
+    let httpStatus: number
+
+    if (err instanceof GitHubError) {
+      if (err.status === 401) {
+        await adminClient
+          .from('profiles')
+          .update({ github_access_token: null, github_username: null, github_connected_at: null })
+          .eq('user_id', project.user_id)
+        message = 'GitHub connection lost — reconnect in Profile'
+        httpStatus = 401
+      } else if (err.status === 404) {
+        message = 'GitHub repo not found. Recreate from Project Settings.'
+        httpStatus = 404
+      } else if (err.status === 422) {
+        message = 'A repository with this name already exists in your GitHub account'
+        httpStatus = 422
+      } else {
+        message = err.message
+        httpStatus = err.status
+      }
+    } else {
+      message = 'Failed to export to GitHub'
+      httpStatus = 500
+    }
+
     await supabase.from('projects').update({ github_sync_error: message }).eq('id', id)
-    const status = err instanceof GitHubError && err.status === 422 ? 422 : 500
-    return NextResponse.json({ error: message }, { status })
+    return NextResponse.json({ error: message }, { status: httpStatus })
   }
 }
