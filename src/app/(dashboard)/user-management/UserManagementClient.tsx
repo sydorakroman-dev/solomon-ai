@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
-import { Shield, Users, FolderOpen } from 'lucide-react'
+import { Shield, Users, FolderOpen, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -53,6 +54,8 @@ export default function UserManagementClient() {
   const [projects, setProjects] = useState<AdminProject[]>([])
   const [loading, setLoading] = useState(true)
   const [updatingUser, setUpdatingUser] = useState<string | null>(null)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -66,6 +69,29 @@ export default function UserManagementClient() {
       toast.error('Failed to load users and projects')
     }).finally(() => setLoading(false))
   }, [])
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Invite sent to ${inviteEmail.trim()}`)
+      setInviteEmail('')
+      // Refresh user list
+      fetch('/api/admin/users').then(r => r.ok ? r.json() : []).then(u => setUsers(Array.isArray(u) ? u : []))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to send invite')
+    } finally {
+      setInviting(false)
+    }
+  }
 
   async function updateRole(userId: string, role: 'admin' | 'user') {
     setUpdatingUser(userId)
@@ -138,6 +164,29 @@ export default function UserManagementClient() {
 
         {/* Users Tab */}
         <TabsContent value="users">
+          <Card className="mb-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Invite User</CardTitle>
+              <CardDescription>Send an invitation email to a new user</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleInvite} className="flex gap-2">
+                <Input
+                  type="email"
+                  placeholder="user@example.com"
+                  value={inviteEmail}
+                  onChange={e => setInviteEmail(e.target.value)}
+                  className="max-w-sm"
+                  required
+                />
+                <Button type="submit" size="sm" disabled={inviting || !inviteEmail.trim()}>
+                  <UserPlus className="h-4 w-4 mr-1.5" />
+                  {inviting ? 'Sending...' : 'Send invite'}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader>
               <CardTitle className="text-base">Users</CardTitle>

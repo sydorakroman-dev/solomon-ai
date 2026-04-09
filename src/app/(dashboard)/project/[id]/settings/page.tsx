@@ -35,7 +35,6 @@ export default function ProjectSettingsPage() {
   const [githubRepoUrl, setGithubRepoUrl] = useState<string | null>(null)
   const [githubExportedAt, setGithubExportedAt] = useState<string | null>(null)
   const [githubSyncError, setGithubSyncError] = useState<string | null>(null)
-  const [currentUserGithubUsername, setCurrentUserGithubUsername] = useState<string | null>(null)
   const [showInitModal, setShowInitModal] = useState(false)
   const [initRepoName, setInitRepoName] = useState('')
   const [initIsPrivate, setInitIsPrivate] = useState(false)
@@ -48,8 +47,7 @@ export default function ProjectSettingsPage() {
       fetch(`/api/project-prompts?project_id=${id}`).then(r => r.json()),
       fetch('/api/system-prompts').then(r => r.json()),
       fetch(`/api/projects/${id}`).then(r => r.ok ? r.json() : null),
-      fetch('/api/profile').then(r => r.ok ? r.json() : null),
-    ]).then(([projectPrompts, sysPrompts, project, profile]) => {
+    ]).then(([projectPrompts, sysPrompts, project]) => {
       if (Array.isArray(projectPrompts)) {
         const map: Record<string, string> = {}
         projectPrompts.forEach((p: { stage: string; content: string }) => { map[p.stage] = p.content })
@@ -67,9 +65,6 @@ export default function ProjectSettingsPage() {
         setGithubExportedAt(project.github_exported_at ?? null)
         setGithubSyncError(project.github_sync_error ?? null)
         setInitRepoName(project.name?.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ?? '')
-      }
-      if (profile) {
-        setCurrentUserGithubUsername(profile.github_username ?? null)
       }
     }).catch(() => {
       // silently ignore — individual fetch guards already handle non-2xx
@@ -299,69 +294,53 @@ export default function ProjectSettingsPage() {
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {!currentUserGithubUsername ? (
-                    <div className="space-y-2">
-                      <Button size="sm" disabled title="Connect GitHub in your profile first">
-                        <Github className="h-4 w-4 mr-2" />
-                        Create GitHub Repository
-                      </Button>
-                      <p className="text-xs text-muted-foreground">
-                        Connect your GitHub account in{' '}
-                        <a href="/profile" className="underline underline-offset-2">Profile</a>{' '}
-                        first.
-                      </p>
+                  {showInitModal ? (
+                    <div className="space-y-3 rounded-lg border p-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="repo-name">Repository name</Label>
+                        <Input
+                          id="repo-name"
+                          value={initRepoName}
+                          onChange={e => { setInitRepoName(e.target.value); setInitError(null) }}
+                          placeholder="my-project"
+                        />
+                        {initError && (
+                          <p className="text-xs text-destructive">{initError}</p>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="repo-private"
+                          checked={initIsPrivate}
+                          onChange={e => setInitIsPrivate(e.target.checked)}
+                          className="h-4 w-4"
+                        />
+                        <Label htmlFor="repo-private" className="font-normal">Private repository</Label>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleInitGitHub}
+                          disabled={initLoading || !initRepoName.trim()}
+                        >
+                          {initLoading ? 'Creating...' : 'Create repository'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => { setShowInitModal(false); setInitError(null) }}
+                          disabled={initLoading}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
                     </div>
                   ) : (
-                    <>
-                      {showInitModal ? (
-                        <div className="space-y-3 rounded-lg border p-4">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="repo-name">Repository name</Label>
-                            <Input
-                              id="repo-name"
-                              value={initRepoName}
-                              onChange={e => { setInitRepoName(e.target.value); setInitError(null) }}
-                              placeholder="my-project"
-                            />
-                            {initError && (
-                              <p className="text-xs text-destructive">{initError}</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="checkbox"
-                              id="repo-private"
-                              checked={initIsPrivate}
-                              onChange={e => setInitIsPrivate(e.target.checked)}
-                              className="h-4 w-4"
-                            />
-                            <Label htmlFor="repo-private" className="font-normal">Private repository</Label>
-                          </div>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              onClick={handleInitGitHub}
-                              disabled={initLoading || !initRepoName.trim()}
-                            >
-                              {initLoading ? 'Creating...' : 'Create repository'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              onClick={() => { setShowInitModal(false); setInitError(null) }}
-                              disabled={initLoading}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <Button size="sm" onClick={() => { setShowInitModal(true); setInitError(null) }}>
-                          <Github className="h-4 w-4 mr-2" />
-                          Create GitHub Repository
-                        </Button>
-                      )}
-                    </>
+                    <Button size="sm" onClick={() => { setShowInitModal(true); setInitError(null) }}>
+                      <Github className="h-4 w-4 mr-2" />
+                      Create GitHub Repository
+                    </Button>
                   )}
                 </div>
               )}

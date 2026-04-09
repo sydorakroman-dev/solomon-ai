@@ -38,6 +38,20 @@ export async function GET() {
   return NextResponse.json(users)
 }
 
+export async function POST(request: Request) {
+  const admin = await requireAdmin()
+  if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })
+
+  const { email } = await request.json()
+  if (!email?.trim()) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
+
+  const adminClient = await createAdminClient()
+  const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email.trim())
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
+
+  return NextResponse.json({ user_id: data.user.id, email: data.user.email })
+}
+
 export async function PATCH(request: Request) {
   const admin = await requireAdmin()
   if (!admin) return NextResponse.json({ error: 'Admin only' }, { status: 403 })

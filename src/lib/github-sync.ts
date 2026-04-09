@@ -17,36 +17,22 @@ export function repoNameFromUrl(url: string): string {
 
 async function getOwnerToken(
   projectId: string
-): Promise<{ token: string; repoFullName: string; ownerId: string } | null> {
+): Promise<{ token: string; repoFullName: string } | null> {
+  const token = process.env.GITHUB_ACCESS_TOKEN
+  if (!token) return null
+
   const supabase = await createClient()
   const { data: project } = await supabase
     .from('projects')
-    .select('user_id, github_repo_url')
+    .select('github_repo_url')
     .eq('id', projectId)
     .single()
   if (!project?.github_repo_url) return null
 
-  const adminClient = await createAdminClient()
-  const { data: profile } = await adminClient
-    .from('profiles')
-    .select('github_access_token')
-    .eq('user_id', project.user_id)
-    .single()
-  if (!profile?.github_access_token) return null
-
   return {
-    token: profile.github_access_token,
+    token,
     repoFullName: repoNameFromUrl(project.github_repo_url),
-    ownerId: project.user_id,
   }
-}
-
-async function handleTokenRevoked(ownerId: string): Promise<void> {
-  const adminClient = await createAdminClient()
-  await adminClient
-    .from('profiles')
-    .update({ github_access_token: null, github_username: null, github_connected_at: null })
-    .eq('user_id', ownerId)
 }
 
 // Use adminClient so these writes succeed regardless of who triggered the save
@@ -89,7 +75,6 @@ export async function syncCharterToGitHub(projectId: string): Promise<GitHubSync
     return { githubSyncError: null }
   } catch (err) {
     const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    if (err instanceof GitHubError && err.status === 401) await handleTokenRevoked(ctx.ownerId)
     await saveError(projectId, message)
     return { githubSyncError: message }
   }
@@ -120,7 +105,6 @@ export async function syncPrdToGitHub(projectId: string): Promise<GitHubSyncResu
     return { githubSyncError: null }
   } catch (err) {
     const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    if (err instanceof GitHubError && err.status === 401) await handleTokenRevoked(ctx.ownerId)
     await saveError(projectId, message)
     return { githubSyncError: message }
   }
@@ -153,7 +137,6 @@ export async function syncEpicToGitHub(epicId: string, projectId: string): Promi
     return { githubSyncError: null }
   } catch (err) {
     const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    if (err instanceof GitHubError && err.status === 401) await handleTokenRevoked(ctx.ownerId)
     await saveError(projectId, message)
     return { githubSyncError: message }
   }
@@ -197,7 +180,6 @@ export async function syncStoryToGitHub(storyId: string, projectId: string): Pro
     return { githubSyncError: null }
   } catch (err) {
     const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    if (err instanceof GitHubError && err.status === 401) await handleTokenRevoked(ctx.ownerId)
     await saveError(projectId, message)
     return { githubSyncError: message }
   }

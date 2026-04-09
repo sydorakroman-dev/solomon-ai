@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Eye, EyeOff, Github } from 'lucide-react'
+import { Eye, EyeOff } from 'lucide-react'
 
 function KeyInput({
   id,
@@ -54,49 +54,16 @@ export default function ProfilePage() {
   const [passwordForm, setPasswordForm] = useState({ current: '', next: '', confirm: '' })
   const [savingPassword, setSavingPassword] = useState(false)
   const [loadingProfile, setLoadingProfile] = useState(true)
-  const [githubUsername, setGithubUsername] = useState<string | null>(null)
-  const [githubConnectedAt, setGithubConnectedAt] = useState<string | null>(null)
-  const [disconnectingGitHub, setDisconnectingGitHub] = useState(false)
-
   useEffect(() => {
     fetch('/api/profile')
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (data?.email) setCurrentEmail(data.email)
         if (data?.full_name) setProfileName(data.full_name)
-        setGithubUsername(data?.github_username ?? null)
-        setGithubConnectedAt(data?.github_connected_at ?? null)
       })
       .catch(() => null)
       .finally(() => setLoadingProfile(false))
   }, [])
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('github') === 'connected') {
-      toast.success('GitHub connected successfully')
-      window.history.replaceState({}, '', '/profile')
-    }
-    if (params.get('error') === 'github_auth_failed') {
-      toast.error('GitHub authorization failed. Please try again.')
-      window.history.replaceState({}, '', '/profile')
-    }
-  }, [])
-
-  async function handleDisconnectGitHub() {
-    setDisconnectingGitHub(true)
-    try {
-      const res = await fetch('/api/auth/github', { method: 'DELETE' })
-      if (!res.ok) throw new Error((await res.json()).error)
-      setGithubUsername(null)
-      setGithubConnectedAt(null)
-      toast.success('GitHub disconnected')
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to disconnect GitHub')
-    } finally {
-      setDisconnectingGitHub(false)
-    }
-  }
 
   async function handleSaveName(e: React.FormEvent) {
     e.preventDefault()
@@ -273,51 +240,6 @@ export default function ProfilePage() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="pb-4">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Github className="h-4 w-4" />
-              GitHub
-            </CardTitle>
-            <CardDescription>
-              Connect your GitHub account to export requirements to GitHub repositories.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {githubUsername ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Connected as @{githubUsername}</p>
-                  {githubConnectedAt && (
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      Since {new Date(githubConnectedAt).toLocaleDateString()}
-                    </p>
-                  )}
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleDisconnectGitHub}
-                  disabled={disconnectingGitHub}
-                >
-                  {disconnectingGitHub ? 'Disconnecting...' : 'Disconnect'}
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Not connected. Solomon will create and update repositories on your behalf.
-                </p>
-                <Button asChild size="sm">
-                  <a href="/api/auth/github">
-                    <Github className="h-4 w-4 mr-2" />
-                    Connect GitHub
-                  </a>
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   )

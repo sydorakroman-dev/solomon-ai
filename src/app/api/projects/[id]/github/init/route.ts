@@ -29,20 +29,15 @@ export async function POST(request: Request, { params }: Params) {
     .single()
   if (!project) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  // Get owner's GitHub token
-  const adminClient = await createAdminClient()
-  const { data: ownerProfile } = await adminClient
-    .from('profiles')
-    .select('github_access_token')
-    .eq('user_id', project.user_id)
-    .single()
-  const token = ownerProfile?.github_access_token
+  const token = process.env.GITHUB_ACCESS_TOKEN
   if (!token) {
     return NextResponse.json(
-      { error: 'GitHub account not connected. Connect GitHub in your Profile first.' },
-      { status: 403 }
+      { error: 'GitHub integration not configured. Contact your administrator.' },
+      { status: 503 }
     )
   }
+
+  const adminClient = await createAdminClient()
 
   const body = await request.json() as { repoName?: string; isPrivate?: boolean }
   const repoName = body.repoName?.trim() || slugifyRepoName(project.name)
@@ -159,11 +154,7 @@ export async function POST(request: Request, { params }: Params) {
 
     if (err instanceof GitHubError) {
       if (err.status === 401) {
-        await adminClient
-          .from('profiles')
-          .update({ github_access_token: null, github_username: null, github_connected_at: null })
-          .eq('user_id', project.user_id)
-        message = 'GitHub connection lost — reconnect in Profile'
+        message = 'GitHub token invalid or expired — update GITHUB_ACCESS_TOKEN'
         httpStatus = 401
       } else if (err.status === 404) {
         message = 'GitHub repo not found. Recreate from Project Settings.'
