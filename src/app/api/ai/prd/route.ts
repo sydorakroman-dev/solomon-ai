@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { generateText } from '@/lib/ai/providers'
 import { truncateContent } from '@/lib/utils/files'
+import { getEffectiveAISettings } from '@/lib/ai/settings'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -17,9 +18,7 @@ export async function POST(request: Request) {
     .eq('id', project_id).eq('user_id', user.id).single()
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-  const adminClient = await createAdminClient()
-  const { data: settings } = await adminClient
-    .from('user_settings').select('*').eq('user_id', user.id).single()
+  const settings = await getEffectiveAISettings(user.id)
 
   const [{ data: projectPrompt }, { data: systemPrompt }, { data: charter }, { data: sources }] =
     await Promise.all([
@@ -130,14 +129,14 @@ Mark unknowns as [TBD]. Be specific and actionable. Requirements must be SMART.
 
   try {
     const content = await generateText({
-      model: settings?.model ?? 'anthropic:claude-sonnet-4-6',
+      model: settings.model,
       systemPrompt: systemInstruction,
       userPrompt: userMessage,
       maxTokens: 6000,
       apiKeys: {
-        anthropic: settings?.anthropic_api_key,
-        openai: settings?.openai_api_key,
-        gemini: settings?.gemini_api_key,
+        anthropic: settings.anthropic_api_key,
+        openai: settings.openai_api_key,
+        gemini: settings.gemini_api_key,
       },
     })
 

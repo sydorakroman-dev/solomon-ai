@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
-import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { generateText } from '@/lib/ai/providers'
+import { getEffectiveAISettings } from '@/lib/ai/settings'
 
 async function jinaSearch(query: string): Promise<string> {
   const url = `https://s.jina.ai/${encodeURIComponent(query)}`
@@ -30,12 +31,7 @@ export async function POST(request: Request) {
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-  const adminClient = await createAdminClient()
-  const { data: settings } = await adminClient
-    .from('user_settings')
-    .select('*')
-    .eq('user_id', user.id)
-    .single()
+  const settings = await getEffectiveAISettings(user.id)
 
   const industry = industryOverride?.trim() || project.industry
   const company  = companyOverride?.trim()  || project.client_name
@@ -85,14 +81,14 @@ Write a clear, structured summary covering:
 Keep it factual and relevant to software development requirements gathering. Format with markdown headings.`
 
     const content = await generateText({
-      model: settings?.model ?? 'anthropic:claude-sonnet-4-6',
+      model: settings.model,
       systemPrompt: '',
       userPrompt,
       maxTokens: 2000,
       apiKeys: {
-        anthropic: settings?.anthropic_api_key,
-        openai: settings?.openai_api_key,
-        gemini: settings?.gemini_api_key,
+        anthropic: settings.anthropic_api_key,
+        openai: settings.openai_api_key,
+        gemini: settings.gemini_api_key,
       },
     })
 
