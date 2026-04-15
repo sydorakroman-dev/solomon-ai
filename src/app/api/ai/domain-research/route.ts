@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateText } from '@/lib/ai/providers'
 
 async function jinaSearch(query: string): Promise<string> {
@@ -30,7 +30,8 @@ export async function POST(request: Request) {
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-  const { data: settings } = await supabase
+  const adminClient = await createAdminClient()
+  const { data: settings } = await adminClient
     .from('user_settings')
     .select('anthropic_api_key, openai_api_key, gemini_api_key, model')
     .eq('user_id', user.id)

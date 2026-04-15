@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateText } from '@/lib/ai/providers'
 import { truncateContent } from '@/lib/utils/files'
 
@@ -21,8 +21,9 @@ export async function POST(request: Request) {
 
   if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
 
-  // Get user settings
-  const { data: settings } = await supabase
+  // Get user settings via admin client to bypass RLS
+  const adminClient = await createAdminClient()
+  const { data: settings } = await adminClient
     .from('user_settings')
     .select('anthropic_api_key, openai_api_key, gemini_api_key, model')
     .eq('user_id', user.id)
