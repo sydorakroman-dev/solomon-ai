@@ -108,9 +108,12 @@ export async function POST(request: Request) {
 
   return NextResponse.json(data, { status: 201 })
   } catch (err) {
-    console.error('[POST /api/sources]', err)
+    const message = err instanceof Error ? err.message : String(err)
+    const stack = err instanceof Error ? err.stack : undefined
+    const extra = typeof err === 'object' && err !== null ? JSON.stringify(err) : undefined
+    console.error('[POST /api/sources]', { message, stack, extra })
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : 'Internal server error' },
+      { error: message || extra || 'Unknown error', detail: stack?.split('\n')[1]?.trim() },
       { status: 500 }
     )
   }

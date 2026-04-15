@@ -40,7 +40,7 @@ export default function CallTranscriptForm({ projectId, onAdded }: Props) {
         formData.append('type', 'call_transcript')
         formData.append('title', title || file!.name)
         const res = await fetch('/api/sources', { method: 'POST', body: formData })
-        if (!res.ok) { const t = await res.text(); let m = `Upload failed (${res.status})`; try { const j = JSON.parse(t); m = j.error || j.message || JSON.stringify(j) } catch { m = t.slice(0, 200) || m } console.error('sources error', res.status, t); throw new Error(m) }
+        if (!res.ok) { const t = await res.text(); let m = `Upload failed (${res.status})`; try { const j = JSON.parse(t); m = [j.error, j.detail].filter(Boolean).join(' — ') || JSON.stringify(j) } catch { m = t.slice(0, 300) || m } console.error('sources error', res.status, t); throw new Error(m) }
         source = await res.json()
       } else {
         const res = await fetch('/api/sources', {
@@ -53,7 +53,7 @@ export default function CallTranscriptForm({ projectId, onAdded }: Props) {
             content: text,
           }),
         })
-        if (!res.ok) { const t = await res.text(); let m = `Upload failed (${res.status})`; try { const j = JSON.parse(t); m = j.error || j.message || JSON.stringify(j) } catch { m = t.slice(0, 200) || m } console.error('sources error', res.status, t); throw new Error(m) }
+        if (!res.ok) { const t = await res.text(); let m = `Upload failed (${res.status})`; try { const j = JSON.parse(t); m = [j.error, j.detail].filter(Boolean).join(' — ') || JSON.stringify(j) } catch { m = t.slice(0, 300) || m } console.error('sources error', res.status, t); throw new Error(m) }
         source = await res.json()
       }
 
