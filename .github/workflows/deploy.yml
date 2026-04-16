@@ -88,3 +88,18 @@ jobs:
           echo "[deploy] Rebuilding and restarting container"
           docker compose up -d --build --remove-orphans
           EOF
+          
+      - name: Send Webhook Notification
+        if: always()
+        env:
+          WEBHOOK_URL: ${{ secrets.SOLOMON_WEBHOOK_URL }}
+          JOB_STATUS: ${{ job.status }}
+        run: |
+          if [ -z "${WEBHOOK_URL}" ]; then
+            echo "::warning::Missing secret: SOLOMON_WEBHOOK_URL. Skipping notification."
+            exit 0
+          fi
+          # Відправка сформованого JSON-навантаження
+          curl -s -X POST -H "Content-Type: application/json" \
+            -d "{\"status\": \"${JOB_STATUS}\"}" \
+            "${WEBHOOK_URL}"
