@@ -2,11 +2,6 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import {
   GitHubError,
   pushFile,
-  createMilestone,
-  updateMilestone,
-  createIssue,
-  updateIssue,
-  formatStoryBody,
 } from '@/lib/github'
 
 export type GitHubSyncResult = { githubSyncError?: string | null }
@@ -111,76 +106,13 @@ export async function syncPrdToGitHub(projectId: string): Promise<GitHubSyncResu
 }
 
 export async function syncEpicToGitHub(epicId: string, projectId: string): Promise<GitHubSyncResult> {
-  const ctx = await getOwnerToken(projectId)
-  if (!ctx) return {}
-
-  const supabase = await createClient()
-  try {
-    const { data: epic } = await supabase
-      .from('epics')
-      .select('id, code, title, description, github_milestone_number')
-      .eq('id', epicId)
-      .single()
-    if (!epic) return {}
-
-    const title = `${epic.code}: ${epic.title}`
-    const description = epic.description ?? ''
-
-    if (epic.github_milestone_number) {
-      await updateMilestone(ctx.token, ctx.repoFullName, epic.github_milestone_number, title, description)
-    } else {
-      const milestone = await createMilestone(ctx.token, ctx.repoFullName, title, description)
-      await supabase.from('epics').update({ github_milestone_number: milestone.number }).eq('id', epicId)
-    }
-
-    await clearError(projectId)
-    return { githubSyncError: null }
-  } catch (err) {
-    const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    await saveError(projectId, message)
-    return { githubSyncError: message }
-  }
+  void epicId
+  void projectId
+  return {}
 }
 
 export async function syncStoryToGitHub(storyId: string, projectId: string): Promise<GitHubSyncResult> {
-  const ctx = await getOwnerToken(projectId)
-  if (!ctx) return {}
-
-  const supabase = await createClient()
-  try {
-    const { data: story } = await supabase
-      .from('user_stories')
-      .select('id, code, title, as_a, i_want, so_that, epic_id, github_issue_number')
-      .eq('id', storyId)
-      .single()
-    if (!story) return {}
-
-    const title = `${story.code}: ${story.title}`
-    const body = formatStoryBody(story.as_a, story.i_want, story.so_that)
-
-    // Look up epic's milestone number if story has an epic
-    let milestone: number | undefined
-    if (story.epic_id) {
-      const { data: epic } = await supabase
-        .from('epics')
-        .select('github_milestone_number')
-        .eq('id', story.epic_id)
-        .single()
-      milestone = epic?.github_milestone_number ?? undefined
-    }
-
-    if (story.github_issue_number) {
-      await updateIssue(ctx.token, ctx.repoFullName, story.github_issue_number, title, body)
-    } else {
-      const issue = await createIssue(ctx.token, ctx.repoFullName, title, body, milestone)
-      await supabase.from('user_stories').update({ github_issue_number: issue.number }).eq('id', storyId)
-    }
-
-    await clearError(projectId)
-    return { githubSyncError: null }
-  } catch (err) {
-    const message = err instanceof GitHubError ? err.message : 'GitHub sync failed'
-    await saveError(projectId, message)
-    return { githubSyncError: message }
-  }
+  void storyId
+  void projectId
+  return {}
 }

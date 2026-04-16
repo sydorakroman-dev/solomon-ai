@@ -41,8 +41,16 @@ describe('repoNameFromUrl', () => {
 
 // ── syncPrdToGitHub ────────────────────────────────────────────────────────────
 describe('syncPrdToGitHub', () => {
+  const originalToken = process.env.GITHUB_ACCESS_TOKEN
+
   beforeEach(() => {
     vi.clearAllMocks()
+    process.env.GITHUB_ACCESS_TOKEN = 'tok'
+  })
+
+  afterEach(() => {
+    if (originalToken === undefined) delete process.env.GITHUB_ACCESS_TOKEN
+    else process.env.GITHUB_ACCESS_TOKEN = originalToken
   })
 
   it('returns empty object (silent skip) when project has no github_repo_url', async () => {
@@ -57,7 +65,7 @@ describe('syncPrdToGitHub', () => {
   })
 
   it('returns { githubSyncError: null } on successful sync', async () => {
-    // getOwnerToken: project has repo_url, profile has token
+    // getOwnerToken: project has repo_url, env has token
     let callCount = 0
     mockFrom.mockImplementation(() => {
       callCount++
@@ -66,10 +74,6 @@ describe('syncPrdToGitHub', () => {
         return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { user_id: 'u1', github_repo_url: 'https://github.com/user/repo' } }) }) }) }
       }
       if (callCount === 2) {
-        // profiles query (admin-scoped)
-        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { github_access_token: 'tok' } }) }) }) }
-      }
-      if (callCount === 3) {
         // prd query
         return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { id: 'prd-1', content: '# PRD', github_file_sha: null } }) }) }) }
       }
@@ -90,9 +94,6 @@ describe('syncPrdToGitHub', () => {
         return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { user_id: 'u1', github_repo_url: 'https://github.com/user/repo' } }) }) }) }
       }
       if (callCount === 2) {
-        return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { github_access_token: 'tok' } }) }) }) }
-      }
-      if (callCount === 3) {
         return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: { id: 'prd-1', content: '# PRD', github_file_sha: null } }) }) }) }
       }
       return { update: mockUpdate }
