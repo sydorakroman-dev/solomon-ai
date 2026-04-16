@@ -5,10 +5,8 @@ import {
   GitHubError,
   slugifyRepoName,
   createRepo,
+  copyRepoDir,
   pushFile,
-  createMilestone,
-  createIssue,
-  formatStoryBody,
 } from '@/lib/github'
 import { repoNameFromUrl } from '@/lib/github-sync'
 
@@ -37,6 +35,22 @@ export async function POST(request: Request, { params }: Params) {
     )
   }
 
+  const org = process.env.GITHUB_ORG
+  if (!org) {
+    return NextResponse.json(
+      { error: 'GitHub organization not configured. Contact your administrator.' },
+      { status: 503 }
+    )
+  }
+
+  const templateRepo = process.env.GITHUB_TEMPLATE_REPO
+  if (!templateRepo) {
+    return NextResponse.json(
+      { error: 'GitHub template repository not configured. Contact your administrator.' },
+      { status: 503 }
+    )
+  }
+
   const adminClient = await createAdminClient()
 
   const body = await request.json() as { repoName?: string; isPrivate?: boolean }
@@ -53,12 +67,15 @@ export async function POST(request: Request, { params }: Params) {
       repoFullName = repoNameFromUrl(repoUrl)
     } else {
       // Create new repo
-      const repo = await createRepo(token, repoName, isPrivate)
+      const repo = await createRepo(token, org, repoName, isPrivate)
       repoFullName = repo.full_name
       repoUrl = repo.html_url
       // Save immediately so partial retry works
       await supabase.from('projects').update({ github_repo_url: repoUrl }).eq('id', id)
     }
+
+    // Sync template GitHub workflows/config
+    await copyRepoDir(token, templateRepo, '.github', repoFullName, '.github')
 
     // Push Charter (if content exists)
     const { data: charter } = await supabase
@@ -94,51 +111,6 @@ export async function POST(request: Request, { params }: Params) {
         'docs: add PRD'
       )
       await supabase.from('prd').update({ github_file_sha: sha }).eq('id', prd.id)
-    }
-
-    // Create milestones for epics that don't have one yet
-    const { data: epics } = await supabase
-      .from('epics')
-      .select('id, code, title, description, github_milestone_number')
-      .eq('project_id', id)
-      .order('order')
-    for (const epic of epics ?? []) {
-      if (epic.github_milestone_number) continue
-      const milestone = await createMilestone(
-        token,
-        repoFullName,
-        `${epic.code}: ${epic.title}`,
-        epic.description ?? ''
-      )
-      await supabase.from('epics').update({ github_milestone_number: milestone.number }).eq('id', epic.id)
-    }
-
-    // Reload epics with milestone numbers for story assignment
-    const { data: epicsWithNumbers } = await supabase
-      .from('epics')
-      .select('id, github_milestone_number')
-      .eq('project_id', id)
-    const milestoneMap = Object.fromEntries(
-      (epicsWithNumbers ?? []).map(e => [e.id, e.github_milestone_number as number | null])
-    )
-
-    // Create issues for stories that don't have one yet
-    const { data: stories } = await supabase
-      .from('user_stories')
-      .select('id, code, title, as_a, i_want, so_that, epic_id, github_issue_number')
-      .eq('project_id', id)
-      .order('order')
-    for (const story of stories ?? []) {
-      if (story.github_issue_number) continue
-      const milestone = story.epic_id ? milestoneMap[story.epic_id] ?? undefined : undefined
-      const issue = await createIssue(
-        token,
-        repoFullName,
-        `${story.code}: ${story.title}`,
-        formatStoryBody(story.as_a, story.i_want, story.so_that),
-        milestone
-      )
-      await supabase.from('user_stories').update({ github_issue_number: issue.number }).eq('id', story.id)
     }
 
     // Mark export complete

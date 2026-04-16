@@ -42,14 +42,114 @@ export async function getGitHubUser(token: string): Promise<{ login: string }> {
 
 export async function createRepo(
   token: string,
+  org: string,
   name: string,
   isPrivate: boolean
 ): Promise<{ full_name: string; html_url: string }> {
-  const res = await ghFetch(token, '/user/repos', {
+  const res = await ghFetch(token, `/orgs/${org}/repos`, {
     method: 'POST',
     body: JSON.stringify({ name, private: isPrivate, auto_init: true }),
   })
   return res.json()
+}
+
+type GitHubContentsItem = {
+  type: 'file' | 'dir' | 'symlink' | 'submodule'
+  name: string
+  path: string
+}
+
+type GitHubContentsFile = {
+  type: 'file'
+  name: string
+  path: string
+  sha: string
+  content?: string
+  encoding?: string
+}
+
+function encodeGitHubPath(path: string): string {
+  return path
+    .split('/')
+    .map(seg => encodeURIComponent(seg))
+    .join('/')
+}
+
+export async function listRepoDir(token: string, repo: string, path: string): Promise<GitHubContentsItem[]> {
+  const res = await ghFetch(token, `/repos/${repo}/contents/${encodeGitHubPath(path)}`)
+  const data = await res.json()
+  if (!Array.isArray(data)) {
+    throw new GitHubError(500, 'GitHub contents API: expected directory listing')
+  }
+  return data as GitHubContentsItem[]
+}
+
+export async function getRepoFile(token: string, repo: string, path: string): Promise<GitHubContentsFile> {
+  const res = await ghFetch(token, `/repos/${repo}/contents/${encodeGitHubPath(path)}`)
+  return res.json() as Promise<GitHubContentsFile>
+}
+
+export async function getRepoFileSha(token: string, repo: string, path: string): Promise<string | undefined> {
+  try {
+    const file = await getRepoFile(token, repo, path)
+    return file.sha
+  } catch (err) {
+    if (err instanceof GitHubError && err.status === 404) return undefined
+    throw err
+  }
+}
+
+export async function pushFileBase64(
+  token: string,
+  repo: string,
+  path: string,
+  base64Content: string,
+  sha?: string,
+  message = 'chore: sync template files'
+): Promise<{ sha: string }> {
+  const body: Record<string, unknown> = {
+    message,
+    content: base64Content.replace(/\n/g, ''),
+  }
+  if (sha) body.sha = sha
+  const res = await ghFetch(token, `/repos/${repo}/contents/${path}`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  })
+  const data = await res.json() as { content: { sha: string } }
+  return { sha: data.content.sha }
+}
+
+export async function copyRepoDir(
+  token: string,
+  sourceRepo: string,
+  sourceDir: string,
+  destRepo: string,
+  destDir: string = sourceDir
+): Promise<void> {
+  const items = await listRepoDir(token, sourceRepo, sourceDir)
+  for (const item of items) {
+    if (item.type === 'dir') {
+      const relative = item.path.startsWith(sourceDir) ? item.path.slice(sourceDir.length) : ''
+      const nextDestDir = `${destDir}${relative}`.replace(/\/+/g, '/')
+      await copyRepoDir(token, sourceRepo, item.path, destRepo, nextDestDir)
+      continue
+    }
+    if (item.type !== 'file') continue
+
+    const relative = item.path.startsWith(sourceDir) ? item.path.slice(sourceDir.length) : ''
+    const destPath = `${destDir}${relative}`.replace(/\/+/g, '/').replace(/^\//, '')
+
+    const file = await getRepoFile(token, sourceRepo, item.path)
+    const content = (file.content ?? '').trim()
+    if (!content) continue
+    if (file.encoding && file.encoding !== 'base64') {
+      throw new GitHubError(500, `Unsupported GitHub content encoding: ${file.encoding}`)
+    }
+
+    const existingSha = await getRepoFileSha(token, destRepo, destPath)
+    await pushFileBase64(token, destRepo, destPath, content, existingSha, `chore: sync ${destPath} from template`)
+  }
 }
 
 // NOTE: pushFile uses Buffer.from() which requires the Node.js runtime.

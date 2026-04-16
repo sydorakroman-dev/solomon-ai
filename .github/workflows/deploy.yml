@@ -20,10 +20,9 @@ jobs:
       DEPLOY_KEY: ${{ secrets.SOLOMON_DEPLOY_KEY }}
       DEPLOY_PATH: /root/app/solomon
       DEPLOY_PORT: 22
+      REPO_SSH_URL: git@github.com:${{ github.repository }}.git
+      DEPLOY_BRANCH: main
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
       - name: Validate deployment secret
         run: |
           if [ -z "${DEPLOY_KEY}" ]; then
@@ -39,36 +38,53 @@ jobs:
           chmod 600 ~/.ssh/id_ed25519
           ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "${DEPLOY_HOST}" >> ~/.ssh/known_hosts
 
-      - name: Sync project files to server
-        run: |
-          rsync -az --delete \
-            --exclude '.env' \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude '.next' \
-            --exclude 'node_modules' \
-            -e "ssh -i ~/.ssh/id_ed25519 -p ${DEPLOY_PORT:-22}" \
-            ./ "${DEPLOY_USER}@${DEPLOY_HOST}:${DEPLOY_PATH}/"
-
-      - name: Rebuild and restart Solomon
+      - name: Git deploy + rebuild Solomon
         run: |
           ssh -i ~/.ssh/id_ed25519 -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" <<EOF
-          set -e
+          set -euo pipefail
+
+          export REPO_SSH_URL="${REPO_SSH_URL}"
+          export DEPLOY_PATH="${DEPLOY_PATH}"
+          export DEPLOY_BRANCH="${DEPLOY_BRANCH}"
+
+          # Use server-side deploy key for GitHub access
+          if [ ! -f "/root/.ssh/solomon_github_actions" ]; then
+            echo "[deploy] Missing server deploy key: /root/.ssh/solomon_github_actions" >&2
+            exit 1
+          fi
+          mkdir -p /root/.ssh
+          chmod 600 /root/.ssh/solomon_github_actions
+          ssh-keyscan -H github.com >> /root/.ssh/known_hosts 2>/dev/null || true
+
+          export GIT_SSH_COMMAND="ssh -i /root/.ssh/solomon_github_actions -o IdentitiesOnly=yes"
+
+          mkdir -p "${DEPLOY_PATH}"
+
+          if [ ! -d "${DEPLOY_PATH}/.git" ]; then
+            echo "[deploy] No .git found; cloning ${REPO_SSH_URL} (${DEPLOY_BRANCH})"
+            env_backup=""
+            if [ -f "${DEPLOY_PATH}/.env" ]; then
+              env_backup="$(mktemp)"
+              cp "${DEPLOY_PATH}/.env" "${env_backup}"
+            fi
+
+            rm -rf "${DEPLOY_PATH}"
+            git clone --branch "${DEPLOY_BRANCH}" "${REPO_SSH_URL}" "${DEPLOY_PATH}"
+
+            if [ -n "${env_backup}" ]; then
+              cp "${env_backup}" "${DEPLOY_PATH}/.env"
+              rm -f "${env_backup}"
+            fi
+          fi
+
           cd "${DEPLOY_PATH}"
+
+          echo "[deploy] Fetching and resetting to origin/${DEPLOY_BRANCH}"
+          git remote set-url origin "${REPO_SSH_URL}"
+          git fetch --prune origin "${DEPLOY_BRANCH}"
+          git checkout -B "${DEPLOY_BRANCH}" "origin/${DEPLOY_BRANCH}"
+          git reset --hard "origin/${DEPLOY_BRANCH}"
+
+          echo "[deploy] Rebuilding and restarting container"
           docker compose up -d --build --remove-orphans
           EOF
-
-      - name: Send Webhook Notification
-        if: always()
-        env:
-          WEBHOOK_URL: ${{ secrets.SOLOMON_WEBHOOK_URL }}
-          JOB_STATUS: ${{ job.status }}
-        run: |
-          if [ -z "${WEBHOOK_URL}" ]; then
-            echo "::warning::Missing secret: SOLOMON_WEBHOOK_URL. Skipping notification."
-            exit 0
-          fi
-          # Відправка сформованого JSON-навантаження
-          curl -s -X POST -H "Content-Type: application/json" \
-            -d "{\"status\": \"${JOB_STATUS}\"}" \
-            "${WEBHOOK_URL}"
