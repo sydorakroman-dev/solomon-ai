@@ -2,11 +2,17 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const { searchParams } = new URL(request.url)
   const code = searchParams.get('code')
   const tokenHash = searchParams.get('token_hash')
   const type = searchParams.get('type')
   const next = searchParams.get('next') ?? '/dashboard'
+
+  // Use the configured public URL so Docker/reverse-proxy internal hostnames
+  // don't leak into redirects.
+  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '')
+    ?? process.env.APP_URL?.replace(/\/$/, '')
+    ?? 'https://solomon.quitcode.com'
 
   const supabase = await createClient()
 
