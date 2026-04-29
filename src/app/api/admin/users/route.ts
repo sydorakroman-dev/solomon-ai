@@ -45,7 +45,14 @@ export async function POST(request: Request) {
   const { email } = await request.json()
   if (!email?.trim()) return NextResponse.json({ error: 'Email is required' }, { status: 400 })
 
-  const appUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? 'https://solomon.quitcode.com'
+  // Derive the public URL from Traefik's x-forwarded-host header so that
+  // APP_URL=http://localhost:3000 in the server .env never pollutes the
+  // Supabase redirectTo (which must be a whitelisted public URL).
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const appUrl = forwardedHost
+    ? `https://${forwardedHost}`
+    : 'https://solomon.quitcode.com'
+
   const adminClient = await createAdminClient()
   const { data, error } = await adminClient.auth.admin.inviteUserByEmail(email.trim(), {
     redirectTo: `${appUrl}/auth/reset-password`,
