@@ -23,30 +23,54 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
-  const [verifying, setVerifying] = useState(false)
   const [ready, setReady] = useState(false)
   const [verifyError, setVerifyError] = useState<string | null>(null)
 
   useEffect(() => {
+    const supabase = createClient()
     const tokenHash = searchParams.get('token_hash')
     const type = searchParams.get('type') as 'invite' | 'recovery' | null
 
-    if (!tokenHash || !type) {
-      // Arrived here after a server-side session (e.g. password reset email).
-      setReady(true)
+    if (tokenHash && type) {
+      // OTP / token_hash flow — verify token directly
+      supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
+        if (error) {
+          setVerifyError(error.message)
+        } else {
+          window.history.replaceState({}, '', '/auth/reset-password')
+          setReady(true)
+        }
+      })
       return
     }
 
-    setVerifying(true)
-    const supabase = createClient()
-    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
-      setVerifying(false)
-      if (error) {
-        setVerifyError(error.message)
-      } else {
-        // Clean token params from the URL without a page reload.
-        window.history.replaceState({}, '', '/auth/reset-password')
+    // No token in query params — check for an existing session or wait for
+    // the browser Supabase client to process an access_token from the URL hash
+    // (implicit flow: Supabase puts access_token in the # fragment)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
         setReady(true)
+        return
+      }
+
+      // Listen for SIGNED_IN fired when the browser client processes the hash
+      const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+        if (session) {
+          subscription.unsubscribe()
+          window.history.replaceState({}, '', '/auth/reset-password')
+          setReady(true)
+        }
+      })
+
+      // Show an error after 5 s if no session arrives
+      const timer = setTimeout(() => {
+        subscription.unsubscribe()
+        setVerifyError('This invite link is invalid or has expired. Please ask your admin to send a new invite.')
+      }, 5000)
+
+      return () => {
+        clearTimeout(timer)
+        subscription.unsubscribe()
       }
     })
   }, [searchParams])
@@ -71,6 +95,26 @@ function ResetPasswordForm() {
     }
   }
 
+  if (verifyError) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold tracking-tight">Solomon</h1>
+          </div>
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <p className="text-sm text-destructive">{verifyError}</p>
+              <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>
+                Back to sign in
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 px-4">
       <div className="w-full max-w-sm space-y-6">
@@ -81,26 +125,13 @@ function ResetPasswordForm() {
 
         <Card>
           <CardHeader className="pb-4">
-            <CardTitle className="text-lg">Set new password</CardTitle>
-            <CardDescription>Choose a password for your account</CardDescription>
+            <CardTitle className="text-lg">Set your password</CardTitle>
+            <CardDescription>Choose a password to activate your account</CardDescription>
           </CardHeader>
           <CardContent>
-            {verifying && (
-              <p className="text-sm text-muted-foreground text-center py-4">Verifying your invite link…</p>
-            )}
-
-            {verifyError && (
-              <div className="space-y-3">
-                <p className="text-sm text-destructive">
-                  This invite link is invalid or has expired. Please ask your admin to send a new invite.
-                </p>
-                <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>
-                  Back to sign in
-                </Button>
-              </div>
-            )}
-
-            {ready && (
+            {!ready ? (
+              <p className="text-sm text-muted-foreground text-center py-4">Verifying invite link…</p>
+            ) : (
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label htmlFor="password">New password</Label>
@@ -116,7 +147,7 @@ function ResetPasswordForm() {
                   />
                 </div>
                 <div className="space-y-1.5">
-                  <Label htmlFor="confirm">Confirm new password</Label>
+                  <Label htmlFor="confirm">Confirm password</Label>
                   <Input
                     id="confirm"
                     type="password"
@@ -128,7 +159,7 @@ function ResetPasswordForm() {
                   />
                 </div>
                 <Button type="submit" className="w-full" disabled={loading}>
-                  {loading ? 'Saving…' : 'Set password'}
+                  {loading ? 'Saving…' : 'Set password & sign in'}
                 </Button>
               </form>
             )}
