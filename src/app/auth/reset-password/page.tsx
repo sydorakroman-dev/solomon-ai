@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -11,9 +11,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 
 export default function ResetPasswordPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirm, setConfirm] = useState('')
   const [loading, setLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [ready, setReady] = useState(false)
+  const [verifyError, setVerifyError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const tokenHash = searchParams.get('token_hash')
+    const type = searchParams.get('type') as 'invite' | 'recovery' | null
+
+    if (!tokenHash || !type) {
+      // Arrived here after a server-side session (e.g. password reset email).
+      setReady(true)
+      return
+    }
+
+    setVerifying(true)
+    const supabase = createClient()
+    supabase.auth.verifyOtp({ token_hash: tokenHash, type }).then(({ error }) => {
+      setVerifying(false)
+      if (error) {
+        setVerifyError(error.message)
+      } else {
+        // Clean token params from the URL without a page reload.
+        window.history.replaceState({}, '', '/auth/reset-password')
+        setReady(true)
+      }
+    })
+  }, [searchParams])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -26,10 +54,10 @@ export default function ResetPasswordPage() {
     try {
       const { error } = await supabase.auth.updateUser({ password })
       if (error) throw error
-      toast.success('Password updated. You are now signed in.')
+      toast.success('Password set. You are now signed in.')
       router.replace('/dashboard')
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Failed to update password')
+      toast.error(err instanceof Error ? err.message : 'Failed to set password')
     } finally {
       setLoading(false)
     }
@@ -46,39 +74,56 @@ export default function ResetPasswordPage() {
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg">Set new password</CardTitle>
-            <CardDescription>Choose a new password for your account</CardDescription>
+            <CardDescription>Choose a password for your account</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="password">New password</Label>
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={e => setPassword(e.target.value)}
-                  required
-                  minLength={6}
-                  autoFocus
-                />
+            {verifying && (
+              <p className="text-sm text-muted-foreground text-center py-4">Verifying your invite link…</p>
+            )}
+
+            {verifyError && (
+              <div className="space-y-3">
+                <p className="text-sm text-destructive">
+                  This invite link is invalid or has expired. Please ask your admin to send a new invite.
+                </p>
+                <Button variant="outline" className="w-full" onClick={() => router.replace('/login')}>
+                  Back to sign in
+                </Button>
               </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="confirm">Confirm new password</Label>
-                <Input
-                  id="confirm"
-                  type="password"
-                  placeholder="••••••••"
-                  value={confirm}
-                  onChange={e => setConfirm(e.target.value)}
-                  required
-                  minLength={6}
-                />
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Updating...' : 'Set new password'}
-              </Button>
-            </form>
+            )}
+
+            {ready && (
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="password">New password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    minLength={6}
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="confirm">Confirm new password</Label>
+                  <Input
+                    id="confirm"
+                    type="password"
+                    placeholder="••••••••"
+                    value={confirm}
+                    onChange={e => setConfirm(e.target.value)}
+                    required
+                    minLength={6}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? 'Saving…' : 'Set password'}
+                </Button>
+              </form>
+            )}
           </CardContent>
         </Card>
       </div>
