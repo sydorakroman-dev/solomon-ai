@@ -16,20 +16,23 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
 
-  // Supabase's Site URL is configured as /login, so invite and password-reset
-  // emails land here with the access_token in the URL hash. Detect that and
-  // forward to the appropriate page before showing the login form.
+  // Supabase's Site URL is set to /login, so invite and password-reset emails
+  // land here with access_token in the URL hash. Extract the tokens, call
+  // setSession so they are stored in cookies, then hard-navigate to the
+  // reset-password page (no hash needed — getSession will find it in cookies).
   useEffect(() => {
     const hash = window.location.hash
     if (!hash) return
     const params = new URLSearchParams(hash.slice(1))
     const type = params.get('type')
-    if (type === 'invite' || type === 'recovery') {
-      // Forward the full hash to the reset-password page so the browser
-      // Supabase client can pick up the access_token there.
-      router.replace('/auth/reset-password' + hash)
+    const accessToken = params.get('access_token')
+    const refreshToken = params.get('refresh_token') ?? ''
+    if ((type === 'invite' || type === 'recovery') && accessToken) {
+      const supabase = createClient()
+      supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
+        .then(() => { window.location.replace('/auth/reset-password') })
     }
-  }, [router])
+  }, [])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
