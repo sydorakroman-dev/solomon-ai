@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
@@ -15,6 +15,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
+
+  // Supabase's Site URL is configured as /login, so invite and password-reset
+  // emails land here with the access_token in the URL hash. Detect that and
+  // forward to the appropriate page before showing the login form.
+  useEffect(() => {
+    const hash = window.location.hash
+    if (!hash) return
+    const params = new URLSearchParams(hash.slice(1))
+    const type = params.get('type')
+    if (type === 'invite' || type === 'recovery') {
+      // Forward the full hash to the reset-password page so the browser
+      // Supabase client can pick up the access_token there.
+      router.replace('/auth/reset-password' + hash)
+    }
+  }, [router])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
