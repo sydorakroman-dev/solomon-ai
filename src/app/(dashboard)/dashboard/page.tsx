@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import ProjectCard from '@/components/project/ProjectCard'
 import CreateProjectDialog from '@/components/project/CreateProjectDialog'
 import type { Project } from '@/types'
@@ -6,12 +6,27 @@ import type { Project } from '@/types'
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
+  const adminClient = await createAdminClient()
 
-  const { data: projects } = await supabase
-    .from('projects')
-    .select('*')
-    .eq('user_id', user!.id)
-    .order('updated_at', { ascending: false })
+  // Owned projects + member projects via admin client to bypass RLS
+  const [{ data: ownedProjects }, { data: memberships }] = await Promise.all([
+    adminClient.from('projects').select('*').eq('user_id', user!.id),
+    adminClient.from('project_members').select('project_id').eq('user_id', user!.id),
+  ])
+
+  const ownedIds = new Set((ownedProjects ?? []).map((p: Project) => p.id))
+  const memberIds = (memberships ?? [])
+    .map((m: { project_id: string }) => m.project_id)
+    .filter((id: string) => !ownedIds.has(id))
+
+  let sharedProjects: Project[] = []
+  if (memberIds.length > 0) {
+    const { data } = await adminClient.from('projects').select('*').in('id', memberIds)
+    sharedProjects = (data ?? []) as Project[]
+  }
+
+  const projects = [...(ownedProjects ?? []) as Project[], ...sharedProjects]
+    .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
 
   return (
     <div className="p-8 max-w-6xl mx-auto">
