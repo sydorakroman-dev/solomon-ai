@@ -19,21 +19,26 @@ export async function GET() {
 
   const adminClient = await createAdminClient()
 
-  // Get all profiles
+  // Auth users is the source of truth — profiles may not exist yet for
+  // invited users who haven't completed setup.
+  const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
+
   const { data: profiles } = await adminClient
     .from('profiles')
     .select('user_id, role, full_name, created_at')
-    .order('created_at', { ascending: false })
 
-  // Get auth users to get emails
-  const { data: { users: authUsers } } = await adminClient.auth.admin.listUsers()
+  const profileMap = new Map((profiles ?? []).map(p => [p.user_id, p]))
 
-  const emailMap = new Map(authUsers.map(u => [u.id, u.email]))
-
-  const users = (profiles ?? []).map(p => ({
-    ...p,
-    email: emailMap.get(p.user_id) ?? 'unknown',
-  }))
+  const users = authUsers.map(u => {
+    const profile = profileMap.get(u.id)
+    return {
+      user_id: u.id,
+      email: u.email ?? 'unknown',
+      role: (profile?.role ?? 'user') as 'admin' | 'user',
+      full_name: profile?.full_name ?? null,
+      created_at: profile?.created_at ?? u.created_at,
+    }
+  }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
   return NextResponse.json(users)
 }
@@ -73,8 +78,7 @@ export async function PATCH(request: Request) {
   const adminClient = await createAdminClient()
   const { data, error } = await adminClient
     .from('profiles')
-    .update({ role })
-    .eq('user_id', user_id)
+    .upsert({ user_id, role }, { onConflict: 'user_id' })
     .select()
     .single()
 
