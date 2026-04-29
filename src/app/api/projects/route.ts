@@ -1,19 +1,44 @@
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { data, error } = await supabase
+  // Get project IDs the user is an explicit member of
+  const { data: memberships } = await supabase
+    .from('project_members')
+    .select('project_id')
+    .eq('user_id', user.id)
+
+  const memberProjectIds = (memberships ?? []).map((m: { project_id: string }) => m.project_id)
+
+  const adminClient = await createAdminClient()
+
+  // Owned projects
+  const { data: ownedProjects, error } = await adminClient
     .from('projects')
     .select('*')
     .eq('user_id', user.id)
-    .order('updated_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  // Member projects (not already owned)
+  const ownedIds = new Set((ownedProjects ?? []).map((p: { id: string }) => p.id))
+  let sharedProjects: unknown[] = []
+  if (memberProjectIds.length > 0) {
+    const { data } = await adminClient
+      .from('projects')
+      .select('*')
+      .in('id', memberProjectIds.filter((id: string) => !ownedIds.has(id)))
+    sharedProjects = data ?? []
+  }
+
+  const allProjects = [...(ownedProjects ?? []), ...sharedProjects]
+    .sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+
+  return NextResponse.json(allProjects)
 }
 
 export async function POST(request: Request) {
