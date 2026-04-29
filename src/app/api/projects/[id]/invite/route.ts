@@ -51,9 +51,10 @@ export async function POST(request: Request, { params }: Params) {
   )
   if (inviteError) return NextResponse.json({ error: inviteError.message }, { status: 500 })
 
-  const appUrl = process.env.APP_URL ?? 'https://solomon.quitcode.com'
+  const forwardedHost = request.headers.get('x-forwarded-host')
+  const appUrl = forwardedHost ? `https://${forwardedHost}` : 'https://solomon.quitcode.com'
   await adminClient.auth.admin.inviteUserByEmail(normalizedEmail, {
-    redirectTo: `${appUrl}/auth/callback?next=/dashboard`,
+    redirectTo: `${appUrl}/auth/reset-password`,
   })
 
   return NextResponse.json({ status: 'invited', email: normalizedEmail })

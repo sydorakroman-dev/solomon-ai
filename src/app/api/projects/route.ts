@@ -6,32 +6,47 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Get project IDs the user is an explicit member of
-  const { data: memberships } = await supabase
-    .from('project_members')
-    .select('project_id')
-    .eq('user_id', user.id)
-
-  const memberProjectIds = (memberships ?? []).map((m: { project_id: string }) => m.project_id)
-
   const adminClient = await createAdminClient()
 
-  // Owned projects
-  const { data: ownedProjects, error } = await adminClient
-    .from('projects')
-    .select('*')
-    .eq('user_id', user.id)
+  // Resolve any pending project invitations for this user's email into real memberships
+  const userEmail = user.email?.toLowerCase()
+  if (userEmail) {
+    const { data: pendingInvites } = await adminClient
+      .from('project_invitations')
+      .select('id, project_id, role, invited_by')
+      .eq('email', userEmail)
+      .eq('status', 'pending')
+
+    if (pendingInvites && pendingInvites.length > 0) {
+      await Promise.all(pendingInvites.map(async (inv: { id: string; project_id: string; role: string; invited_by: string }) => {
+        await adminClient.from('project_members').upsert(
+          { project_id: inv.project_id, user_id: user.id, role: inv.role, invited_by: inv.invited_by },
+          { onConflict: 'project_id,user_id' }
+        )
+        await adminClient.from('project_invitations').update({ status: 'accepted' }).eq('id', inv.id)
+      }))
+    }
+  }
+
+  // Use admin client for both queries to bypass RLS restrictions
+  const [{ data: ownedProjects, error }, { data: memberships }] = await Promise.all([
+    adminClient.from('projects').select('*').eq('user_id', user.id),
+    adminClient.from('project_members').select('project_id').eq('user_id', user.id),
+  ])
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Member projects (not already owned)
   const ownedIds = new Set((ownedProjects ?? []).map((p: { id: string }) => p.id))
+  const memberProjectIds = (memberships ?? [])
+    .map((m: { project_id: string }) => m.project_id)
+    .filter((id: string) => !ownedIds.has(id))
+
   let sharedProjects: unknown[] = []
   if (memberProjectIds.length > 0) {
     const { data } = await adminClient
       .from('projects')
       .select('*')
-      .in('id', memberProjectIds.filter((id: string) => !ownedIds.has(id)))
+      .in('id', memberProjectIds)
     sharedProjects = data ?? []
   }
 
