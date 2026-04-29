@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin')
+  const [redirecting, setRedirecting] = useState(false)
 
   // Supabase's Site URL is set to /login, so invite and password-reset emails
   // land here with access_token in the URL hash. Extract the tokens, call
@@ -28,6 +29,7 @@ export default function LoginPage() {
     const accessToken = params.get('access_token')
     const refreshToken = params.get('refresh_token') ?? ''
     if ((type === 'invite' || type === 'recovery') && accessToken) {
+      setRedirecting(true)
       const supabase = createClient()
       supabase.auth.setSession({ access_token: accessToken, refresh_token: refreshToken })
         .then(() => { window.location.replace('/auth/reset-password') })
@@ -69,6 +71,14 @@ export default function LoginPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (redirecting) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-muted/40">
+        <p className="text-sm text-muted-foreground">Redirecting…</p>
+      </div>
+    )
   }
 
   return (
