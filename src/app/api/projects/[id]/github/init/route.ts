@@ -18,14 +18,28 @@ export async function POST(request: Request, { params }: Params) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  // Only project owner can export
-  const { data: project } = await supabase
+  const adminClient = await createAdminClient()
+
+  // Owner or editor can export to GitHub
+  const { data: project } = await adminClient
     .from('projects')
     .select('id, name, user_id, github_repo_url')
     .eq('id', id)
-    .eq('user_id', user.id)
     .single()
-  if (!project) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!project) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const isOwner = project.user_id === user.id
+  if (!isOwner) {
+    const { data: membership } = await adminClient
+      .from('project_members')
+      .select('role')
+      .eq('project_id', id)
+      .eq('user_id', user.id)
+      .single()
+    if (membership?.role !== 'editor') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
 
   const token = process.env.GITHUB_ACCESS_TOKEN
   if (!token) {
@@ -50,8 +64,6 @@ export async function POST(request: Request, { params }: Params) {
       { status: 503 }
     )
   }
-
-  const adminClient = await createAdminClient()
 
   const body = await request.json() as { repoName?: string; isPrivate?: boolean }
   const repoName = body.repoName?.trim() || slugifyRepoName(project.name)
